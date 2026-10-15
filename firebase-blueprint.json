@@ -1,0 +1,133 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information in the system",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Google Auth UID of the user" },
+        "displayName": { "type": "string", "description": "User full name or alias" },
+        "email": { "type": "string", "description": "User email address" },
+        "photoUrl": { "type": "string", "description": "Avatar URL" },
+        "phone": { "type": "string", "description": "Private contact phone number" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp of registration" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last profile update" }
+      },
+      "required": ["userId", "displayName", "email", "createdAt"]
+    },
+    "ItemReport": {
+      "title": "ItemReport",
+      "description": "Lost or found item report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique report ID" },
+        "userId": { "type": "string", "description": "UID of the reporting user" },
+        "userName": { "type": "string", "description": "Name or pseudonym of the reporter" },
+        "userEmail": { "type": "string", "description": "Reporter email" },
+        "type": { "type": "string", "enum": ["LOST", "FOUND"], "description": "Whether report is lost or found" },
+        "title": { "type": "string", "description": "Short title of the item" },
+        "category": { "type": "string", "description": "Category of the item" },
+        "description": { "type": "string", "description": "Detailed description, color, brand, condition" },
+        "locationName": { "type": "string", "description": "Human-readable location or address" },
+        "latitude": { "type": "number", "description": "Approximate latitude coordinate" },
+        "longitude": { "type": "number", "description": "Approximate longitude coordinate" },
+        "dateTimeLostOrFound": { "type": "string", "description": "Estimated date and time" },
+        "imageUrl": { "type": "string", "description": "Image URL or thumbnail" },
+        "status": { "type": "string", "enum": ["OPEN", "MATCHED", "RESOLVED", "FLAGGED_SPAM"], "description": "Status of report" },
+        "isVerified": { "type": "boolean", "description": "Admin verification status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
+      },
+      "required": ["userId", "type", "title", "category", "description", "locationName", "latitude", "longitude", "status", "isVerified", "createdAt"]
+    },
+    "ItemMatch": {
+      "title": "ItemMatch",
+      "description": "AI-detected or system-suggested match between a lost item and found item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique match ID" },
+        "lostItemId": { "type": "string", "description": "Reference ID of lost item" },
+        "foundItemId": { "type": "string", "description": "Reference ID of found item" },
+        "lostUserId": { "type": "string", "description": "User ID of the lost item owner" },
+        "foundUserId": { "type": "string", "description": "User ID of the finder" },
+        "similarityScore": { "type": "number", "description": "Confidence percentage score (0-100)" },
+        "matchReason": { "type": "string", "description": "AI analysis summary for match" },
+        "status": { "type": "string", "enum": ["PENDING", "ACCEPTED", "REJECTED"], "description": "Match verification state" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["lostItemId", "foundItemId", "lostUserId", "foundUserId", "similarityScore", "status", "createdAt"]
+    },
+    "ChatRoom": {
+      "title": "ChatRoom",
+      "description": "Secure anonymous chat conversation between owner and finder",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique chat room ID" },
+        "itemId": { "type": "string", "description": "Reference item ID" },
+        "itemTitle": { "type": "string", "description": "Title of the item being discussed" },
+        "participantUids": { "type": "array", "description": "Array of 2 user IDs in conversation" },
+        "lastMessage": { "type": "string", "description": "Preview of latest message" },
+        "lastMessageTime": { "type": "string", "format": "date-time", "description": "Timestamp of latest message" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Chat creation timestamp" }
+      },
+      "required": ["itemId", "participantUids", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Message inside a secure chat room",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique message ID" },
+        "chatId": { "type": "string", "description": "Parent chat ID" },
+        "senderId": { "type": "string", "description": "Sender User UID" },
+        "senderName": { "type": "string", "description": "Sender display name or alias" },
+        "text": { "type": "string", "description": "Message body" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Message server timestamp" }
+      },
+      "required": ["chatId", "senderId", "text", "createdAt"]
+    },
+    "UserNotification": {
+      "title": "UserNotification",
+      "description": "In-app notification for matches, verification, and chat updates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique notification ID" },
+        "userId": { "type": "string", "description": "Recipient User UID" },
+        "title": { "type": "string", "description": "Notification title" },
+        "body": { "type": "string", "description": "Notification details" },
+        "itemId": { "type": "string", "description": "Associated item ID" },
+        "matchId": { "type": "string", "description": "Associated match ID" },
+        "isRead": { "type": "boolean", "description": "Read flag" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Notification timestamp" }
+      },
+      "required": ["userId", "title", "body", "isRead", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile records containing account info and settings"
+    },
+    "/items/{itemId}": {
+      "schema": "ItemReport",
+      "description": "All public lost and found reports"
+    },
+    "/matches/{matchId}": {
+      "schema": "ItemMatch",
+      "description": "AI matches between lost items and found items"
+    },
+    "/chats/{chatId}": {
+      "schema": "ChatRoom",
+      "description": "Secure direct communication channels between item reporters"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Individual messages in a secure chat room"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "UserNotification",
+      "description": "User alerts and match notification records"
+    }
+  }
+}

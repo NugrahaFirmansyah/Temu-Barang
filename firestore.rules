@@ -1,0 +1,218 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == 'nugrahafirmansyah49@gmail.com') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+             data.email is string && data.email.size() <= 200 &&
+             (!('photoUrl' in data) || data.photoUrl == null || (data.photoUrl is string && data.photoUrl.size() <= 2000)) &&
+             (!('phone' in data) || data.phone == null || (data.phone is string && data.phone.size() <= 50)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('updatedAt' in data) || data.updatedAt == null || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    function isValidItemReport(data) {
+      return data.userId is string && data.userId.size() <= 128 &&
+             (!('userName' in data) || data.userName == null || (data.userName is string && data.userName.size() <= 100)) &&
+             (!('userEmail' in data) || data.userEmail == null || (data.userEmail is string && data.userEmail.size() <= 200)) &&
+             (data.type == 'LOST' || data.type == 'FOUND') &&
+             data.title is string && data.title.size() >= 2 && data.title.size() <= 150 &&
+             data.category is string && data.category.size() <= 80 &&
+             data.description is string && data.description.size() <= 3000 &&
+             data.locationName is string && data.locationName.size() <= 200 &&
+             data.latitude is number && data.longitude is number &&
+             (!('dateTimeLostOrFound' in data) || data.dateTimeLostOrFound == null || (data.dateTimeLostOrFound is string && data.dateTimeLostOrFound.size() <= 100)) &&
+             (!('imageUrl' in data) || data.imageUrl == null || (data.imageUrl is string && data.imageUrl.size() <= 500000)) &&
+             (data.status == 'OPEN' || data.status == 'MATCHED' || data.status == 'RESOLVED' || data.status == 'FLAGGED_SPAM') &&
+             data.isVerified is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('updatedAt' in data) || data.updatedAt == null || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    function isValidItemMatch(data) {
+      return data.lostItemId is string && data.lostItemId.size() <= 128 &&
+             data.foundItemId is string && data.foundItemId.size() <= 128 &&
+             data.lostUserId is string && data.lostUserId.size() <= 128 &&
+             data.foundUserId is string && data.foundUserId.size() <= 128 &&
+             data.similarityScore is number && data.similarityScore >= 0 && data.similarityScore <= 100 &&
+             (!('matchReason' in data) || data.matchReason == null || (data.matchReason is string && data.matchReason.size() <= 2000)) &&
+             (data.status == 'PENDING' || data.status == 'ACCEPTED' || data.status == 'REJECTED') &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('updatedAt' in data) || data.updatedAt == null || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    function isValidChatRoom(data) {
+      return data.itemId is string && data.itemId.size() <= 128 &&
+             (!('itemTitle' in data) || data.itemTitle == null || (data.itemTitle is string && data.itemTitle.size() <= 150)) &&
+             data.participantUids is list && data.participantUids.size() == 2 &&
+             data.participantUids[0] is string && data.participantUids[1] is string &&
+             (!('lastMessage' in data) || data.lastMessage == null || (data.lastMessage is string && data.lastMessage.size() <= 1000)) &&
+             (!('lastMessageTime' in data) || data.lastMessageTime == null || (data.lastMessageTime is timestamp && data.lastMessageTime <= request.time)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    function isValidChatMessage(data) {
+      return data.chatId is string && data.chatId.size() <= 128 &&
+             data.senderId is string && data.senderId.size() <= 128 &&
+             (!('senderName' in data) || data.senderName == null || (data.senderName is string && data.senderName.size() <= 100)) &&
+             data.text is string && data.text.size() >= 1 && data.text.size() <= 2000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    function isValidUserNotification(data) {
+      return data.userId is string && data.userId.size() <= 128 &&
+             data.title is string && data.title.size() <= 150 &&
+             data.body is string && data.body.size() <= 1000 &&
+             (!('itemId' in data) || data.itemId == null || (data.itemId is string && data.itemId.size() <= 128)) &&
+             (!('matchId' in data) || data.matchId == null || (data.matchId is string && data.matchId.size() <= 128)) &&
+             data.isRead is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isSignedIn() && isAdmin();
+      allow create: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       isValidUserProfile(incoming());
+      allow update: if isSignedIn() &&
+                       (request.auth.uid == userId || isAdmin()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoUrl', 'phone', 'updatedAt']);
+      allow delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // Items collection (Lost and Found reports)
+    match /items/{itemId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() &&
+                       incoming().userId == request.auth.uid &&
+                       isValidItemReport(incoming());
+      allow update: if isSignedIn() &&
+                       isValidItemReport(incoming()) &&
+                       (
+                         isAdmin() ||
+                         (
+                           existing().userId == request.auth.uid &&
+                           incoming().userId == existing().userId &&
+                           incoming().createdAt == existing().createdAt &&
+                           incoming().diff(existing()).affectedKeys().hasOnly([
+                             'title', 'category', 'description', 'locationName',
+                             'latitude', 'longitude', 'dateTimeLostOrFound', 'imageUrl',
+                             'status', 'updatedAt'
+                           ])
+                         )
+                       );
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    // Matches collection
+    match /matches/{matchId} {
+      allow get, list: if isSignedIn() && (
+        resource.data.lostUserId == request.auth.uid ||
+        resource.data.foundUserId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() &&
+                       (incoming().lostUserId == request.auth.uid || incoming().foundUserId == request.auth.uid || isAdmin()) &&
+                       isValidItemMatch(incoming());
+      allow update: if isSignedIn() &&
+                       (existing().lostUserId == request.auth.uid || existing().foundUserId == request.auth.uid || isAdmin()) &&
+                       incoming().lostItemId == existing().lostItemId &&
+                       incoming().foundItemId == existing().foundItemId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidItemMatch(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if isSignedIn() && (existing().lostUserId == request.auth.uid || existing().foundUserId == request.auth.uid || isAdmin());
+    }
+
+    // Chats collection
+    match /chats/{chatId} {
+      allow get, list: if isSignedIn() && (
+        request.auth.uid in resource.data.participantUids ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() &&
+                       (request.auth.uid in incoming().participantUids) &&
+                       isValidChatRoom(incoming());
+      allow update: if isSignedIn() &&
+                       (request.auth.uid in existing().participantUids) &&
+                       incoming().itemId == existing().itemId &&
+                       incoming().participantUids == existing().participantUids &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidChatRoom(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'lastMessageTime']);
+      allow delete: if isSignedIn() && (request.auth.uid in existing().participantUids || isAdmin());
+
+      // Chat Messages subcollection
+      match /messages/{messageId} {
+        allow get, list: if isSignedIn() && (
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantUids ||
+          isAdmin()
+        );
+        allow create: if isSignedIn() &&
+                         incoming().senderId == request.auth.uid &&
+                         (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantUids) &&
+                         isValidChatMessage(incoming());
+        allow delete: if isSignedIn() && (existing().senderId == request.auth.uid || isAdmin());
+      }
+    }
+
+    // User Notifications collection
+    match /notifications/{notificationId} {
+      allow get, list: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && isValidUserNotification(incoming());
+      allow update: if isSignedIn() &&
+                       (existing().userId == request.auth.uid || isAdmin()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidUserNotification(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['isRead']);
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    // Admins collection
+    match /admins/{adminId} {
+      allow get: if isSignedIn();
+      allow list, create, update, delete: if isAdmin();
+    }
+  }
+}

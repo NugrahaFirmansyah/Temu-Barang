@@ -1,0 +1,8 @@
+{
+  "name": "TemuBarang",
+  "description": "Aplikasi Temukan Barang Hilang Berbasis Lokasi & AI dengan pencocokan cerdas, peta interaktif, laporan kehilangan & penemuan, verifikasi admin, dan chat aman.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
